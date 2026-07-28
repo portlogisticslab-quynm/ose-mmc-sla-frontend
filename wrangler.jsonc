@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ose-mmc-sla-frontend",
+  "compatibility_date": "2026-07-27",
+  "assets": {
+    "directory": "./public"
+  }
+}

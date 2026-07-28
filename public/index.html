@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Queue Simulation M/M/c + SLA</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  <script src="config.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <h1>Queue Simulation M/M/c + SLA</h1>
+
+    <p>
+      Web-based discrete-event simulation for truck arrivals at a
+      warehouse or port gate with multiple parallel servers.
+    </p>
+
+    <div id="backendStatus" class="backend-status checking">
+      Backend: checking...
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <aside class="panel controls">
+
+      <h2>Inputs</h2>
+
+      <div class="two-col">
+
+        <div class="form-row">
+          <label for="lambdaInput">λ: trucks/hour</label>
+
+          <input
+            id="lambdaInput"
+            type="number"
+            value="18"
+            min="0.0001"
+            step="0.1"
+          >
+        </div>
+
+        <div class="form-row">
+          <label for="muInput">μ: trucks/hour/server</label>
+
+          <input
+            id="muInput"
+            type="number"
+            value="15"
+            min="0.0001"
+            step="0.1"
+          >
+        </div>
+
+      </div>
+
+      <div class="two-col">
+
+        <div class="form-row">
+          <label for="simTimeInput">Simulation time: hours</label>
+
+          <input
+            id="simTimeInput"
+            type="number"
+            value="4"
+            min="0.01"
+            step="0.25"
+          >
+        </div>
+
+        <div class="form-row">
+          <label for="slaInput">SLA waiting limit: minutes</label>
+
+          <input
+            id="slaInput"
+            type="number"
+            value="20"
+            min="0"
+            step="1"
+          >
+        </div>
+
+      </div>
+
+      <div class="form-row">
+        <label for="scenariosInput">
+          Server scenarios c
+        </label>
+
+        <input
+          id="scenariosInput"
+          type="text"
+          value="1 2 3"
+          placeholder="Example: 1 2 3"
+        >
+      </div>
+
+      <div class="two-col">
+
+        <div class="form-row">
+          <label for="binsInput">Histogram bins</label>
+
+          <input
+            id="binsInput"
+            type="number"
+            value="20"
+            min="5"
+            max="100"
+            step="1"
+          >
+        </div>
+
+        <div class="form-row">
+          <label for="seedInput">
+            Random seed
+          </label>
+
+          <input
+            id="seedInput"
+            type="text"
+            value=""
+            placeholder="Empty = random"
+          >
+        </div>
+
+      </div>
+
+      <div class="button-grid">
+
+        <button
+          id="runButton"
+          class="primary wide"
+          type="button"
+        >
+          Run Simulation
+        </button>
+
+        <button
+          id="exportCsvButton"
+          class="success"
+          type="button"
+          disabled
+        >
+          Export CSV Logs
+        </button>
+
+        <button
+          id="exportVideoButtonLeft"
+          type="button"
+          disabled
+        >
+          Export Animation Video
+        </button>
+
+      </div>
+
+      <div id="status" class="status">
+        Status: Ready.
+      </div>
+
+      <div class="group">
+        <div class="group-title">Summary table</div>
+
+        <div class="summary-wrap">
+          <table id="summaryTable">
+            <thead>
+              <tr>
+                <th>c</th>
+                <th>N</th>
+                <th>Mean wait</th>
+                <th>P95 wait</th>
+                <th>Mean system</th>
+                <th>Queue max</th>
+                <th>Util.</th>
+                <th>&gt; SLA</th>
+                <th>≤ SLA</th>
+              </tr>
+            </thead>
+
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="note">
+        Time outputs are reported in minutes. Utilization is clipped
+        to the selected simulation horizon.
+      </p>
+
+    </aside>
+
+    <section class="panel workspace">
+
+      <div class="tabs">
+
+        <button
+          class="tab-button active"
+          data-tab="mainTab"
+          type="button"
+        >
+          Main
+        </button>
+
+        <button
+          class="tab-button"
+          data-tab="chartsTab"
+          type="button"
+        >
+          Charts
+        </button>
+
+        <button
+          class="tab-button"
+          data-tab="animationTab"
+          type="button"
+        >
+          Animation
+        </button>
+
+      </div>
+
+      <div id="mainTab" class="tab-content active">
+
+        <div class="main-card">
+
+          <h2>Queue Simulation M/M/c + SLA</h2>
+
+          <p>
+            Enter the arrival rate, service rate, simulation horizon,
+            SLA threshold, and server scenarios. Click
+            <strong>Run Simulation</strong> to compare alternative
+            numbers of parallel servers.
+          </p>
+
+          <div class="formula">
+            Interarrival time:
+            T<sub>a</sub> = −ln(U)/λ
+            <br>
+            Service time:
+            T<sub>s</sub> = −ln(U)/μ
+            <br>
+            System type:
+            M/M/c, first-come first-served, unlimited waiting space
+          </div>
+
+          <p>
+            The application calculates mean waiting time, 95th
+            percentile waiting time, mean time in system, maximum
+            observed queue length, server utilization, and SLA
+            compliance.
+          </p>
+
+          <div class="copyright">
+            ©2026 Dr. Nguyen Minh Quy –
+            info@portlogistics.vn –
+            https://portlogistics.vn/
+          </div>
+
+        </div>
+
+      </div>
+
+      <div id="chartsTab" class="tab-content">
+
+        <div class="chart-grid">
+
+          <article class="chart-panel full">
+            <div class="chart-title">
+              Waiting-time histograms with common bins
+            </div>
+
+            <div class="chart-wrap">
+              <canvas id="histogramChart"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-panel">
+            <div class="chart-title">
+              Mean and P95 waiting time
+            </div>
+
+            <div class="chart-wrap">
+              <canvas id="waitBarChart"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-panel">
+            <div class="chart-title">
+              Percentage of SLA violations
+            </div>
+
+            <div class="chart-wrap">
+              <canvas id="slaChart"></canvas>
+            </div>
+          </article>
+
+        </div>
+
+      </div>
+
+      <div id="animationTab" class="tab-content">
+
+        <div class="animation-controls">
+
+          <select id="scenarioSelect" disabled>
+            <option value="">
+              Scenario: run simulation first
+            </option>
+          </select>
+
+          <button id="playButton" type="button" disabled>
+            Play
+          </button>
+
+          <button id="resetButton" type="button" disabled>
+            Reset
+          </button>
+
+          <button id="stepButton" type="button" disabled>
+            Step
+          </button>
+
+          <div class="speed-box">
+            <span>Speed</span>
+
+            <input
+              id="speedSlider"
+              type="range"
+              min="0.25"
+              max="4"
+              value="1"
+              step="0.25"
+              disabled
+            >
+
+            <strong id="speedValue">1.00×</strong>
+          </div>
+
+          <div id="animationInfo" class="anim-info">
+            Run simulation first
+          </div>
+
+        </div>
+
+        <div class="animation-grid">
+
+          <div class="canvas-wrap">
+            <canvas
+              id="sceneCanvas"
+              width="1200"
+              height="500"
+            ></canvas>
+          </div>
+
+          <div class="chart-wrap">
+            <canvas id="timeSeriesChart"></canvas>
+          </div>
+
+        </div>
+
+        <p class="note">
+          Video export uses MP4 when supported by the browser;
+          otherwise it automatically downloads WebM.
+        </p>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+</body>
+</html>
