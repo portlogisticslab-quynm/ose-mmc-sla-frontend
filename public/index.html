@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Queue Simulation M/M/c + SLA</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=202610221504">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
-  <script src="config.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="config.js?v=202610221504" defer></script>
+  <script src="app.js?v=202610221504" defer></script>
 </head>
 <body>
 <div class="app">
@@ -21,6 +21,7 @@
       warehouse or port gate with multiple parallel servers.
     </p>
 
+    <select id="backendSelect" class="backend-select" aria-label="Server" title="Server (?api=auto|home|render)"><option value="auto">Auto (Home &rarr; Render)</option><option value="home">Home server</option><option value="render">Render</option></select>
     <div id="backendStatus" class="backend-status checking">
       Backend: checking...
     </div>

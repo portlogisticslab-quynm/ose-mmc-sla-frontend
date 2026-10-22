@@ -95,7 +95,7 @@ function apiUrl(path) {
 }
 
 async function apiRequest(path, options = {}) {
-  const response = await fetch(apiUrl(path), {
+  const response = await window.oseFetch(path, {
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
@@ -131,10 +131,10 @@ async function checkBackend() {
 
   try {
     const data = await apiRequest("/api/health", { method: "GET" });
-    backendStatus.textContent = `Backend: online (${data.version})`;
+    backendStatus.textContent = `Backend: ${await oseServerName()} · v${data.version}`;
     backendStatus.className = "backend-status online";
   } catch (error) {
-    backendStatus.textContent = `Backend: offline (${error.message})`;
+    backendStatus.textContent = `Backend: ${await oseServerName()} offline (${error.message})`;
     backendStatus.className = "backend-status offline";
   }
 }
@@ -1255,3 +1255,22 @@ function drawInitialScene() {
     sceneCanvas.height / 2
   );
 }
+
+/* Server selector: Auto / Home / Render (config.js reads ?api=) */
+async function oseServerName() {
+  const base = String(await window.OSE_API_READY || window.OSE_API_BASE || "");
+  if (base.includes("onrender.com")) return "Render";
+  if (base.includes("127.0.0.1") || base.includes("localhost")) return "Local";
+  return "Home server";
+}
+(function initServerSelect() {
+  const sel = document.getElementById("backendSelect");
+  if (!sel) return;
+  if (["localhost", "127.0.0.1"].includes(location.hostname)) { sel.hidden = true; return; }
+  let pinned = new URLSearchParams(location.search).get("api");
+  try { pinned = pinned || localStorage.getItem("ose_api"); } catch (e) {}
+  sel.value = ["home", "render"].includes(pinned) ? pinned : "auto";
+  sel.addEventListener("change", () => {
+    const u = new URL(location.href); u.searchParams.set("api", sel.value); location.href = u.toString();
+  });
+})();

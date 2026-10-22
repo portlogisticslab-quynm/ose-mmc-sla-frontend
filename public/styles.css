@@ -441,3 +441,5 @@
   color: var(--danger);
 }
 
+.backend-select { font: inherit; font-size: 0.85rem; padding: 4px 6px; border-radius: 6px; margin-right: 8px; max-width: 190px; }
+@media (max-width: 600px) { .backend-select { max-width: 110px; } }
