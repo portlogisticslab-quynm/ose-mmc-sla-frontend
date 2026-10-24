@@ -87,56 +87,19 @@ const sceneCanvas = document.getElementById("sceneCanvas");
 const sceneContext = sceneCanvas.getContext("2d");
 
 // ============================================================
-// API
+// SIMULATION ENGINE (sim.js, runs in the browser — no backend)
 // ============================================================
 
-function apiUrl(path) {
-  return `${window.OSE_API_BASE}${path}`;
-}
-
-async function apiRequest(path, options = {}) {
-  const response = await window.oseFetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
-  });
-
-  let payload = null;
-
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    const message = payload?.detail || payload?.message || `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-
-  return payload;
-}
-
-async function checkBackend() {
-  if (window.OSE_API_BASE.includes("REPLACE-WITH-YOUR-RENDER-URL")) {
-    backendStatus.textContent = "Backend: configure config.js";
+function showEngineStatus() {
+  if (!window.MMC) {
+    backendStatus.textContent = "Engine: sim.js not loaded";
     backendStatus.className = "backend-status offline";
+    runButton.disabled = true;
     return;
   }
 
-  backendStatus.textContent = "Backend: checking...";
-  backendStatus.className = "backend-status checking";
-
-  try {
-    const data = await apiRequest("/api/health", { method: "GET" });
-    backendStatus.textContent = `Backend: ${await oseServerName()} · v${data.version}`;
-    backendStatus.className = "backend-status online";
-  } catch (error) {
-    backendStatus.textContent = `Backend: ${await oseServerName()} offline (${error.message})`;
-    backendStatus.className = "backend-status offline";
-  }
+  backendStatus.textContent = `Engine: in-browser · v${window.MMC.VERSION}`;
+  backendStatus.className = "backend-status online";
 }
 
 // ============================================================
@@ -226,22 +189,23 @@ function parseScenarios(text) {
 }
 
 // ============================================================
-// RUN SIMULATION THROUGH BACKEND
+// RUN SIMULATION (IN THE BROWSER)
 // ============================================================
 
 runButton.addEventListener("click", runSimulation);
 
 async function runSimulation() {
   try {
-    setStatus("Sending inputs to the simulation backend...");
+    setStatus("Running simulation in the browser...");
     stopAnimation();
     runButton.disabled = true;
 
     const inputs = parseInputs();
-    const response = await apiRequest("/api/simulate", {
-      method: "POST",
-      body: JSON.stringify(inputs)
-    });
+
+    // Let the status text paint before the (synchronous) simulation starts
+    await nextFrame();
+
+    const response = window.MMC.simulate(inputs);
 
     state.results = response.results;
     state.meta = response.meta;
@@ -267,6 +231,10 @@ async function runSimulation() {
   } finally {
     runButton.disabled = false;
   }
+}
+
+function nextFrame() {
+  return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
 }
 
 // ============================================================
@@ -315,9 +283,17 @@ function updateCharts() {
 function updateHistogramChart() {
   destroyChart("histogram");
 
-  const allWaits = state.results.flatMap(result => result.waitMinutes);
-  let minimum = Math.min(...allWaits);
-  let maximum = Math.max(...allWaits);
+  // Loop instead of Math.min(...array): large runs (up to 200,000 trucks per scenario)
+  // exceed the browser's argument limit.
+  let minimum = Infinity;
+  let maximum = -Infinity;
+
+  for (const result of state.results) {
+    for (const value of result.waitMinutes) {
+      if (value < minimum) minimum = value;
+      if (value > maximum) maximum = value;
+    }
+  }
 
   if (minimum === maximum) {
     minimum -= 0.5;
@@ -529,7 +505,12 @@ function autoSetAnimationSpeed(maxTime) {
 // ============================================================
 
 function buildTimeSeries(result) {
-  const maximumTime = Math.max(1, ...result.endMinutes);
+  let maximumTime = 1;
+
+  for (const value of result.endMinutes) {
+    if (value > maximumTime) maximumTime = value;
+  }
+
   const targetPoints = 1000;
   const dtMin = Math.max(0.02, Math.min(0.5, maximumTime / targetPoints));
   const time = [];
@@ -550,7 +531,7 @@ function buildTimeSeries(result) {
 }
 
 function cumulativeCountsAtTimes(eventTimes, grid) {
-  const sorted = [...eventTimes].sort((a, b) => a - b);
+  const sorted = Float64Array.from(eventTimes).sort();
   const counts = new Array(grid.length).fill(0);
   let eventIndex = 0;
 
@@ -1050,7 +1031,8 @@ function buildParametersCsv() {
     ["histogram_bins", state.meta.bins],
     ["server_scenarios", state.meta.scenarios.join(" ")],
     ["number_of_arrivals", state.meta.N],
-    ["random_seed", state.meta.resolvedSeed]
+    ["random_seed", state.meta.resolvedSeed],
+    ["engine", `in-browser sim.js v${state.meta.version}`]
   ];
 
   return rows.map(row => row.map(csvEscape).join(",")).join("\n");
@@ -1241,7 +1223,7 @@ function sleep(milliseconds) {
 // ============================================================
 
 drawInitialScene();
-checkBackend();
+showEngineStatus();
 
 function drawInitialScene() {
   sceneContext.fillStyle = "#ffffff";
@@ -1255,22 +1237,3 @@ function drawInitialScene() {
     sceneCanvas.height / 2
   );
 }
-
-/* Server selector: Auto / Home / Render (config.js reads ?api=) */
-async function oseServerName() {
-  const base = String(await window.OSE_API_READY || window.OSE_API_BASE || "");
-  if (base.includes("onrender.com")) return "Render";
-  if (base.includes("127.0.0.1") || base.includes("localhost")) return "Local";
-  return "Home server";
-}
-(function initServerSelect() {
-  const sel = document.getElementById("backendSelect");
-  if (!sel) return;
-  if (["localhost", "127.0.0.1"].includes(location.hostname)) { sel.hidden = true; return; }
-  let pinned = new URLSearchParams(location.search).get("api");
-  try { pinned = pinned || localStorage.getItem("ose_api"); } catch (e) {}
-  sel.value = ["home", "render"].includes(pinned) ? pinned : "auto";
-  sel.addEventListener("change", () => {
-    const u = new URL(location.href); u.searchParams.set("api", sel.value); location.href = u.toString();
-  });
-})();
