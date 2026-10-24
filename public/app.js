@@ -234,7 +234,7 @@ async function runSimulation() {
 }
 
 function nextFrame() {
-  return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  return new Promise(resolve => setTimeout(resolve, 30));
 }
 
 // ============================================================
